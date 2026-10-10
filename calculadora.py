@@ -1,244 +1,150 @@
-"""Calculadora gráfica básica em Python (tkinter).
-
-Executar:  python calculadora.py
-Suporta mouse e teclado (dígitos, + - * / %, Enter, Backspace, Esc).
-"""
-
-import ast
-import operator
-import re
 import tkinter as tk
 
-# ---------- Avaliação segura de expressões (sem usar eval) ----------
 
-OPERADORES = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.Mod: operator.mod,
-    ast.USub: operator.neg,
-    ast.UAdd: operator.pos,
-}
+def calcular(numero1, numero2, operacao):
 
+    if operacao == "+":
+        return (numero1 + numero2)
 
-def avaliar(expressao: str):
-    """Avalia uma expressão aritmética permitindo apenas números e operadores."""
+    elif operacao == "-":
+        return(numero1 - numero2)
 
-    def _eval(no):
-        if isinstance(no, ast.Expression):
-            return _eval(no.body)
-        if isinstance(no, ast.Constant) and isinstance(no.value, (int, float)):
-            return no.value
-        if isinstance(no, ast.BinOp) and type(no.op) in OPERADORES:
-            return OPERADORES[type(no.op)](_eval(no.left), _eval(no.right))
-        if isinstance(no, ast.UnaryOp) and type(no.op) in OPERADORES:
-            return OPERADORES[type(no.op)](_eval(no.operand))
-        raise ValueError("Expressão inválida")
+    elif operacao == "*":
+        return(numero1 * numero2)
 
-    return _eval(ast.parse(expressao, mode="eval"))
+    elif operacao == "**":
+        return(numero1 ** numero2)
 
-
-def formatar(numero) -> str:
-    if isinstance(numero, float):
-        if numero.is_integer() and abs(numero) < 1e15:
-            return str(int(numero))
-        return format(numero, ".10g")
-    return str(numero)
-
-
-# ---------- Interface gráfica ----------
-
-OPS = "+−×÷%"
-
-COR_FUNDO = "#1e1e2e"
-COR_DISPLAY = "#181825"
-COR_TEXTO = "#cdd6f4"
-COR_NUMERO = "#313244"
-COR_NUMERO_HOVER = "#45475a"
-COR_OPERADOR = "#fab387"
-COR_OPERADOR_HOVER = "#f9c9a8"
-COR_ESPECIAL = "#585b70"
-COR_ESPECIAL_HOVER = "#6c7086"
-COR_IGUAL = "#a6e3a1"
-COR_IGUAL_HOVER = "#c0eebc"
-
-# (rótulo, linha, coluna, colunas ocupadas, tipo)
-BOTOES = [
-    ("C", 0, 0, 1, "especial"), ("⌫", 0, 1, 1, "especial"),
-    ("%", 0, 2, 1, "operador"), ("÷", 0, 3, 1, "operador"),
-    ("7", 1, 0, 1, "numero"), ("8", 1, 1, 1, "numero"),
-    ("9", 1, 2, 1, "numero"), ("×", 1, 3, 1, "operador"),
-    ("4", 2, 0, 1, "numero"), ("5", 2, 1, 1, "numero"),
-    ("6", 2, 2, 1, "numero"), ("−", 2, 3, 1, "operador"),
-    ("1", 3, 0, 1, "numero"), ("2", 3, 1, 1, "numero"),
-    ("3", 3, 2, 1, "numero"), ("+", 3, 3, 1, "operador"),
-    ("0", 4, 0, 2, "numero"), (".", 4, 2, 1, "numero"),
-    ("=", 4, 3, 1, "igual"),
-]
-
-CORES = {
-    "numero": (COR_NUMERO, COR_NUMERO_HOVER, COR_TEXTO),
-    "operador": (COR_OPERADOR, COR_OPERADOR_HOVER, COR_FUNDO),
-    "especial": (COR_ESPECIAL, COR_ESPECIAL_HOVER, COR_TEXTO),
-    "igual": (COR_IGUAL, COR_IGUAL_HOVER, COR_FUNDO),
-}
-
-
-class Calculadora(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("Calculadora")
-        self.configure(bg=COR_FUNDO, padx=12, pady=12)
-        self.resizable(False, False)
-
-        self.expressao = ""
-        self.limpar_na_proxima = False  # True após "=" ou erro
-        self.texto_display = tk.StringVar(value="0")
-
-        self._criar_display()
-        self._criar_botoes()
-        self.bind("<Key>", self._tecla)
-
-    # --- construção da interface ---
-
-    def _criar_display(self):
-        tk.Label(
-            self,
-            textvariable=self.texto_display,
-            anchor="e",
-            bg=COR_DISPLAY,
-            fg=COR_TEXTO,
-            font=("Segoe UI", 28),
-            width=14,
-            padx=12,
-            pady=18,
-        ).grid(row=0, column=0, columnspan=4, sticky="nsew", pady=(0, 10))
-
-    def _criar_botoes(self):
-        for rotulo, linha, coluna, span, tipo in BOTOES:
-            fundo, hover, texto = CORES[tipo]
-            botao = tk.Button(
-                self,
-                text=rotulo,
-                font=("Segoe UI", 16, "bold"),
-                bg=fundo,
-                fg=texto,
-                activebackground=hover,
-                activeforeground=texto,
-                relief="flat",
-                bd=0,
-                width=4 * span + (span - 1) * 1,
-                height=2,
-                command=lambda r=rotulo: self.pressionar(r),
-            )
-            botao.grid(
-                row=linha + 1, column=coluna, columnspan=span,
-                sticky="nsew", padx=3, pady=3,
-            )
-            botao.bind("<Enter>", lambda e, b=botao, c=hover: b.config(bg=c))
-            botao.bind("<Leave>", lambda e, b=botao, c=fundo: b.config(bg=c))
-
-        for i in range(4):
-            self.columnconfigure(i, weight=1, uniform="col")
-
-    # --- lógica ---
-
-    def pressionar(self, valor: str):
-        if valor == "C":
-            self.expressao = ""
-            self.limpar_na_proxima = False
-        elif valor == "⌫":
-            if self.limpar_na_proxima:
-                self.expressao = ""
-                self.limpar_na_proxima = False
-            else:
-                self.expressao = self.expressao[:-1]
-        elif valor == "=":
-            self._calcular()
-            return
+    elif operacao == "/":
+        if numero2 == 0:
+            return("Não é possível dividir um número com 0")
         else:
-            self._inserir(valor)
-        self._atualizar_display()
+            return(numero1 / numero2)
 
-    def _inserir(self, valor: str):
-        if self.limpar_na_proxima:
-            # Após um resultado, operador continua a conta; número começa outra.
-            if valor not in OPS:
-                self.expressao = ""
-            self.limpar_na_proxima = False
+    else:
+        return("Digite uma operação válida")
 
-        if valor in OPS:
-            if not self.expressao:
-                if valor == "−":  # permite número negativo no início
-                    self.expressao = "−"
-                return
-            if self.expressao == "−":
-                return
-            if self.expressao[-1] in OPS:  # troca o operador anterior
-                self.expressao = self.expressao[:-1]
-            self.expressao += valor
+
+# variaveis que guardam o estado da calculadora
+digitado = "0"        # o que aparece no visor
+numero1 = None        # primeiro numero da conta
+operacao = ""         # operação escolhida
+novo_numero = True    # se for True, o próximo dígito vai começa um número novo
+
+
+def mostrar():
+    visor.config(text=digitado)
+
+
+def formatar(numero):
+    # 5.0 formata para "5", 2.5 continua "2.5"
+    if numero == int(numero):
+        return str(int(numero))
+    return str(round(numero, 8))
+
+
+def clicar_numero(digito):
+    global digitado, novo_numero
+    if novo_numero or digitado == "0":
+        digitado = digito
+    elif len(digitado) < 12:
+        digitado = digitado + digito
+    novo_numero = False
+    mostrar()
+
+
+def clicar_ponto():
+    global digitado, novo_numero
+    if novo_numero:
+        digitado = "0."
+        novo_numero = False
+    elif "." not in digitado:
+        digitado = digitado + "."
+    mostrar()
+
+
+def clicar_operacao(simbolo):
+    global numero1, operacao, novo_numero
+    if operacao != "" and novo_numero:
+        # apertou duas operações seguidas faz a substituição
+        operacao = simbolo
+        return
+    if operacao != "" and not novo_numero:
+        # fecha contas pendentes
+        if not igual():
             return
-
-        segmento = re.split(r"[+−×÷%]", self.expressao)[-1]
-
-        if valor == ".":
-            if "." in segmento:
-                return
-            self.expressao += "0." if segmento == "" else "."
-            return
-
-        # dígito: evita zeros à esquerda (007)
-        if segmento == "0":
-            self.expressao = self.expressao[:-1] + valor
-        else:
-            self.expressao += valor
-
-    def _calcular(self):
-        if not self.expressao:
-            return
-        expr = self.expressao
-        while expr and expr[-1] in OPS + "−":
-            expr = expr[:-1]
-        if not expr:
-            return
-
-        codigo = expr.replace("×", "*").replace("÷", "/").replace("−", "-")
-        try:
-            resultado = formatar(avaliar(codigo))
-            self.expressao = resultado.replace("-", "−")
-            self.texto_display.set(self._cortar(self.expressao))
-        except ZeroDivisionError:
-            self.expressao = ""
-            self.texto_display.set("Divisão por zero")
-        except Exception:
-            self.expressao = ""
-            self.texto_display.set("Erro")
-        self.limpar_na_proxima = True
-
-    def _atualizar_display(self):
-        self.texto_display.set(self._cortar(self.expressao) if self.expressao else "0")
-
-    @staticmethod
-    def _cortar(texto: str, limite: int = 14) -> str:
-        return texto if len(texto) <= limite else "…" + texto[-(limite - 1):]
-
-    # --- teclado ---
-
-    def _tecla(self, evento):
-        mapa = {"*": "×", "/": "÷", "-": "−", ",": ".", "=": "="}
-        char = evento.char
-        if evento.keysym in ("Return", "KP_Enter"):
-            self.pressionar("=")
-        elif evento.keysym == "BackSpace":
-            self.pressionar("⌫")
-        elif evento.keysym == "Escape":
-            self.pressionar("C")
-        elif char and char in "0123456789.+%":
-            self.pressionar(char)
-        elif char in mapa:
-            self.pressionar(mapa[char])
+    numero1 = float(digitado)
+    operacao = simbolo
+    novo_numero = True
 
 
-if __name__ == "__main__":
-    Calculadora().mainloop()
+def igual():
+    global digitado, numero1, operacao, novo_numero
+    if operacao == "" or novo_numero:
+        return True    # não tem conta pra fazer
+    numero2 = float(digitado)
+    resultado = calcular(numero1, numero2, operacao)
+    numero1 = None
+    operacao = ""
+    novo_numero = True
+    if type(resultado) == str:
+        # a função calcular retornou mensagem de erro
+        print(resultado)
+        digitado = "0"
+        visor.config(text="Erro")
+        return False
+    digitado = formatar(resultado)
+    mostrar()
+    return True
+
+
+def limpar():
+    global digitado, numero1, operacao, novo_numero
+    digitado = "0"
+    numero1 = None
+    operacao = ""
+    novo_numero = True
+    mostrar()
+
+
+# ---- janela ----
+janela = tk.Tk()
+janela.title("Calculadora")
+janela.resizable(False, False)
+
+visor = tk.Label(janela, text="0", anchor="e", font=("Arial", 24),
+                 bg="white", width=14, padx=10, pady=10)
+visor.grid(row=0, column=0, columnspan=4, padx=4, pady=4, sticky="nsew")
+
+
+def criar_botao(texto, linha, coluna, comando, colunas=1, linhas=1):
+    botao = tk.Button(janela, text=texto, font=("Arial", 16),
+                      width=4, height=2, command=comando)
+    botao.grid(row=linha, column=coluna, columnspan=colunas,
+               rowspan=linhas, sticky="nsew", padx=2, pady=2)
+
+
+criar_botao("C", 1, 0, limpar)
+criar_botao("**", 1, 1, lambda: clicar_operacao("**"))
+criar_botao("/", 1, 2, lambda: clicar_operacao("/"))
+criar_botao("*", 1, 3, lambda: clicar_operacao("*"))
+
+criar_botao("7", 2, 0, lambda: clicar_numero("7"))
+criar_botao("8", 2, 1, lambda: clicar_numero("8"))
+criar_botao("9", 2, 2, lambda: clicar_numero("9"))
+criar_botao("-", 2, 3, lambda: clicar_operacao("-"))
+
+criar_botao("4", 3, 0, lambda: clicar_numero("4"))
+criar_botao("5", 3, 1, lambda: clicar_numero("5"))
+criar_botao("6", 3, 2, lambda: clicar_numero("6"))
+criar_botao("+", 3, 3, lambda: clicar_operacao("+"))
+
+criar_botao("1", 4, 0, lambda: clicar_numero("1"))
+criar_botao("2", 4, 1, lambda: clicar_numero("2"))
+criar_botao("3", 4, 2, lambda: clicar_numero("3"))
+criar_botao("=", 4, 3, igual, linhas=2)
+
+criar_botao("0", 5, 0, lambda: clicar_numero("0"), colunas=2)
+criar_botao(".", 5, 2, clicar_ponto)
+
+janela.mainloop()
